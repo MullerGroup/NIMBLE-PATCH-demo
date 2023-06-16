@@ -1170,7 +1170,7 @@ def run_main():
             'slm_noise_enabled' : False,
             'slm_phase_noise_rms' : (2*np.pi)/10,
             'cgh_gs_pix_sampling' : 1, # int, How many simulation pixels are used to represent a single SLM phase modulating element during GS CGH computation
-            'cgh_gs_iter_count' : 50, # int, How many simulation pixels are used to represent a single SLM phase modulating element during GS CGH computation
+            'cgh_gs_iter_count' : 50, # int, How many iterations GS performs
             'simul_pix_sampling' : 5, # int, How many simulation pixels are used to represent a single SLM phase modulating element during propagation
             'simul_array_fold_reduction' : 1, # int (must be < simul_pix_sampling), How much the computed hologram will be resized (shrunk) to save computation time
             'save_results' : False,
