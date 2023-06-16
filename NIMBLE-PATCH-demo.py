@@ -37,11 +37,6 @@ def generate_random_target_locations(system,targets):
     
     print("Generating Randomized Targets...")
     
-    # if system['decompose_en']:
-    #     target_size = compute_target_size(system,targets, min(system['slm_formats'],targets['size']))
-    # else:
-    #     target_size = compute_target_size(system,targets, min(system['slm_formats'],targets['size'])) * system['excess_refresh_rate']
-    
     if targets['random_locations']:
         if system['decompose_en']:
             num_blocks=int(targets['random_target_count']/system['excess_refresh_rate'])
@@ -53,15 +48,9 @@ def generate_random_target_locations(system,targets):
         else:
             num_blocks = np.size(targets['locations'],axis=0)
     
-    # if system['decompose_en']:
-    #     num_blocks = int(np.size(targets['locations'],0)/system['excess_refresh_rate'])
-    # else:
-    #     num_blocks = np.size(targets['locations'],0)
-    
     num_blocks_1D = int(np.sqrt(num_blocks))
-    # NOTE: changed to scale with number of targets per frame
+    # NOTE: target size scales with number of targets per frame
     size_diff_limit = system['cgh_nx'] / min(system['slm_formats']) /2 * num_blocks_1D
-    # size_diff_limit = system['cgh_nx']/ min(system['slm_formats']) /2
     if targets['size'] > size_diff_limit:
         target_size = targets['size']
     else:
@@ -88,6 +77,7 @@ def generate_random_target_locations(system,targets):
             if tgen_compute_time > 15:
                 raise Exception("Targets Not Generatable")
             
+            # Optional constraint to equalize number of targets per depth plane
             #if depth_tally[new_target_depth_index] != min(depth_tally):
                 #return False
             
@@ -187,19 +177,6 @@ def generate_target_plane_intensities(system,decomposed_targets,slm_format,size_
     
     target_plane_intensities = np.zeros([Nz,Nx,Ny])
     target_plane_depths = depths_unique
-
-    
-    #num_blocks = np.size(decomposed_targets,0)
-    #num_blocks_1D = int(np.sqrt(num_blocks))
-    #size_diff_limit = Nx / slm_format /2 * num_blocks_1D
-    
-    # if size_targets > size_diff_limit:
-    #     size_target = size_targets
-    # else:
-    #     size_target = int(np.ceil(size_diff_limit))
-    #     if system['verbose']:
-    #         print('NOTE: Target radius replaced from %i to %i for SLM format of %i to meet diffraction limit.' % (size_targets, size_target,slm_format))
-
     
     for decomposed_target in decomposed_targets:
         target_loc_x = decomposed_target[1]
@@ -255,8 +232,6 @@ def decompose_and_assign_targets(system,targets,current_slm_format,num_frames,nu
     for i in range(num_blocks_1D):
         
         correction_step = centers_1D[i] * correction_scale
-        #phasestep_x[:,i,0] = 2 * np.pi * (-targets_zxy[:,0] * centers_1D[i] * system['slm_pix_size']/ system['optics_focal_length']/2/(system['optics_wavelength']*system['optics_focal_length']/system['slm_pix_size'])  +  (targets_zxy[:,2] - system['cgh_nx']/2) / system['cgh_nx'])
-        #phasestep_y[:,0,i] = 2 * np.pi * (-targets_zxy[:,0] * centers_1D[i] * system['slm_pix_size']/ system['optics_focal_length']/2/(system['optics_wavelength']*system['optics_focal_length']/system['slm_pix_size'])  +  (targets_zxy[:,1] - system['cgh_nx']/2) / system['cgh_nx'])
         phasestep_x[:,i,0] = 2 * np.pi * (correction_step  +  (targets_zxy[:,2] - system['cgh_nx']/2) / system['cgh_nx'])
         phasestep_y[:,0,i] = 2 * np.pi * (correction_step  +  (targets_zxy[:,1] - system['cgh_nx']/2) / system['cgh_nx'])
     
@@ -280,13 +255,10 @@ def decompose_and_assign_targets(system,targets,current_slm_format,num_frames,nu
     loss_xy_2D = np.tile(loss_xy_2D,(1,num_frames))
     row_ind, col_ind = linear_sum_assignment(loss_xy_2D)
     row_ind_sorting = np.argsort(col_ind,axis=0)
-    #row_ind_sorting = np.arange(num_targets)
-    #np.random.shuffle(row_ind_sorting)
     col_ind_sorted = col_ind[row_ind_sorting]
     
     for i in range(num_targets):
         current_target_index = row_ind[row_ind_sorting[i]]
-        #current_target_index = row_ind[i]
         block_indices = np.unravel_index(col_ind_sorted[i]%num_blocks, centers_1D_xtile.shape)
         block_center_x = centers_1D_xtile[block_indices]
         block_center_y = centers_1D_ytile[block_indices]
@@ -370,9 +342,7 @@ def compute_hologram_globalGS(system,targets,slm_format,size_target,num_iter=50,
     
     for iter_index in range(num_iter):
         hologram_phase = _globalGS_iteration(_system_GS,target_plane_intensities_resized,Hs_cgh_gs,slm_format,hologram_phase,source_masked)
-        # plt.figure()
-        # plt.imshow(np.angle(hologram),interpolation='none')
-    
+        
     phase_slm = hologram_phase[int(system['cgh_nx']/2 - slm_format/2 ):int(system['cgh_nx']/2 + slm_format/2 ),int(system['cgh_ny']/2 - slm_format/2 ):int(system['cgh_ny']/2 + slm_format/2 )]
     
     return phase_slm
@@ -492,9 +462,6 @@ def generate_partitioned_hologram(system,targets,current_slm_format,size_target)
         current_center = np.array(([assignments[k,4]],[assignments[k,3]]))
         current_hologram_block = compute_hologram_nimblepatch(system,size_block,assignments[k,1],assignments[k,0],assignments[k,2],(assignments[k,4],assignments[k,3]))
         
-        #plt.figure()
-        #plt.imshow(current_hologram_block,interpolation="none")
-        
         # Add block to frame
         current_hologram_frame[int(current_slm_format/2+current_center[0]-size_block/2):int(current_slm_format/2+current_center[0]+size_block/2), int(current_slm_format/2+current_center[1]-size_block/2):int(current_slm_format/2+current_center[1]+size_block/2)] = current_hologram_block
         
@@ -605,11 +572,6 @@ def calculate_axial_range_step(system, targets, slm_format):
     f = system['optics_focal_length']
     lam = system['optics_wavelength']
     p = system['slm_pix_size']
-    
-
-    #range_axial_both[0] = 8*f*f*lam/((block_format-1)/2)/(lam*lam+4*p*p)
-    #range_axial_both[1] = 1/ (2 * np.amax(abs(centers_1D)) * system['slm_pix_size']/ system['optics_focal_length']/2/(system['optics_wavelength']*system['optics_focal_length']/system['slm_pix_size']))
-    #range_axial[i] = np.amin(range_axial_both)
     
     range_axial = 4*f*f*lam/((block_format-1)/2)/(lam*lam+4*p*p)
     step_axial = 4*lam/((np.sin(np.arctan((block_format/2)*p/f)))**2)
@@ -776,28 +738,6 @@ def generate_full_volume_intensity(holograms,system,current_targets,targets,deco
         plt.axis('off')
         plt.savefig(plot_path,bbox_inches='tight')
         np.save(plot_path+".npy",hologram_cropped_PM_resized)
-    elif mode == 'multi_shot':
-        for hologram_index, hologram in enumerate(holograms):
-            subframe_dir = os.path.join(result_dir,"F",str(hologram_index))
-            if not os.path.isdir(subframe_dir):
-                os.makedirs(subframe_dir)
-            # subframe_path = os.path.join(subframe_dir,"PM")
-            # plt.figure()
-            # plt.imshow(hologram,interpolation='none')
-            # plt.axis('off')
-            # plt.savefig(subframe_path+".npy",bbox_inches='tight')
-            # np.save(subframe_path,hologram)
-            
-            # crop_x_i = int(system['simul_nx'] / 3)
-            # crop_x_f = int(2*crop_x_i-1)
-            # hologram_cropped_PM = hologram[crop_x_i:crop_x_f,crop_x_i:crop_x_f]
-            # hologram_cropped_PM_resized = hologram_cropped_PM[::5,::5]
-            # plot_path = os.path.join(result_dir,"PM_resized")
-            # plt.figure()
-            # plt.imshow(hologram,interpolation='none')
-            # plt.axis('off')
-            # plt.savefig(plot_path,bbox_inches='tight')
-            # np.save(plot_path+".npy",hologram_cropped_PM_resized)
 
     for current_depth_index, current_depth in enumerate(depths):
         
@@ -854,33 +794,7 @@ def generate_full_volume_intensity(holograms,system,current_targets,targets,deco
         plt.savefig(plot_path,bbox_inches='tight')
         
         np.save(npy_filename,depth_intensity)
-        #imageio.imwrite(tif_filename+".tif",depth_intensity)
                 
-        # TODO: Fix this imshow too
-        # if mode == 'multi_shot':
-        #     for idx, individual_depth_intensity in enumerate(depth_intensities):
-        #         subframe_targets = decomposed_targets[idx]
-        #         subframe_targets_at_this_depth = []
-        #         for subframe_target in subframe_targets:
-        #             if abs(subframe_target[0] - current_depth) < (5 * targets['zstack_step']) and current_depth <= subframe_target[0] + targets['zstack_step'] :
-        #                 subframe_targets_at_this_depth.append([(offset + (subframe_target[1]*scaling_factor)),(offset + (subframe_target[2]*scaling_factor))])
-        #         subframe_dir = os.path.join(result_dir,"F",str(idx))
-        #         subframe_path = os.path.join(subframe_dir,str(current_depth_index))
-        #         plt.figure()
-        #         if system['plot_target_circles_en']:
-        #             circles = []
-        #             for target_index, target in enumerate(subframe_targets_at_this_depth):
-        #                 target = subframe_targets_at_this_depth[target_index]
-        #                 circles.append(plt.Circle((target[0],target[1]), size_target, color = 'r', fill=False))
-        #         plt.imshow(individual_depth_intensity,interpolation='none')
-        #         ax = plt.gca()
-        #         if system['plot_target_circles_en']:
-        #             for target_index in range(len(subframe_targets_at_this_depth)):
-        #                 ax.add_patch(circles[target_index])
-        #         plt.axis('off')
-        #         plt.savefig(subframe_path,bbox_inches='tight')
-        #         plt.close()
-    
     plt.close()
     return 3
 
