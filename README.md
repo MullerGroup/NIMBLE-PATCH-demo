@@ -15,3 +15,9 @@ in the context of point cloud generation. The script is initially configured the
 
 By default, GSx1 is selected and GS-based holograms will use this lighter weight variant of the GS algorithm.
 `cgh_gs_pix_sampling` switch of the `system` dictionary can be set to `3` to switch to GSx3.
+
+## NIMBLE-PATCH-plots.py
+This script reproduces the plots presented in the paper from the sweep result files located under the `results` directory.
+Please refer to the paper for the legend of the plots.
+The plots are by default saved under `processed_results` directory once the script is run.
+Names of the figure files indicate which Figure they correspond to within the paper.
